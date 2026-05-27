@@ -161,6 +161,45 @@ input:focus {
   font-weight: 800;
 }
 
+.tag-panel {
+  margin-bottom: 24px;
+}
+
+.collection-list {
+  display: grid;
+  gap: 8px;
+}
+
+.collection-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  padding: 0 10px;
+  text-align: left;
+}
+
+.collection-button.active {
+  border-color: rgba(200, 132, 46, 0.4);
+  background: rgba(200, 132, 46, 0.14);
+  color: #744611;
+}
+
+.collection-button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collection-button strong {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
 .tag-list {
   display: flex;
   flex-wrap: wrap;
@@ -345,6 +384,20 @@ input:focus {
 
 .bookmark-title:hover {
   color: var(--accent);
+}
+
+.collection-badge {
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(38, 109, 101, 0.1);
+  color: var(--accent-strong);
+  padding: 5px 9px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .bookmark-note {

@@ -1,4 +1,5 @@
 const STORAGE_KEY = "bookmark-studio-items";
+const DEFAULT_COLLECTION = "Inbox";
 
 const sampleBookmarks = [
   {
@@ -7,6 +8,7 @@ const sampleBookmarks = [
     url: "https://www.awwwards.com/",
     note: "인터랙션과 웹 디자인 레퍼런스를 모아보기 좋음",
     tags: ["디자인", "영감"],
+    collection: "디자인 레퍼런스",
     favorite: true,
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 2,
   },
@@ -16,6 +18,7 @@ const sampleBookmarks = [
     url: "https://platform.openai.com/docs",
     note: "AI 기능을 붙이고 싶을 때 다시 볼 문서",
     tags: ["개발", "AI"],
+    collection: "개발",
     favorite: false,
     createdAt: Date.now() - 1000 * 60 * 60 * 20,
   },
@@ -25,6 +28,7 @@ const sampleBookmarks = [
     url: "https://www.pinterest.com/",
     note: "분위기와 무드보드 참고용",
     tags: ["무드보드", "영감"],
+    collection: "아이디어",
     favorite: false,
     createdAt: Date.now() - 1000 * 60 * 45,
   },
@@ -34,6 +38,7 @@ const state = {
   bookmarks: loadBookmarks(),
   filter: "all",
   selectedTag: "",
+  selectedCollection: "",
   search: "",
   editingId: "",
 };
@@ -52,9 +57,12 @@ const elements = {
   titleInput: document.querySelector("#titleInput"),
   urlInput: document.querySelector("#urlInput"),
   tagsInput: document.querySelector("#tagsInput"),
+  collectionInput: document.querySelector("#collectionInput"),
+  collectionOptions: document.querySelector("#collectionOptions"),
   noteInput: document.querySelector("#noteInput"),
   bookmarkGrid: document.querySelector("#bookmarkGrid"),
   emptyState: document.querySelector("#emptyState"),
+  collectionList: document.querySelector("#collectionList"),
   tagList: document.querySelector("#tagList"),
   activeContext: document.querySelector("#activeContext"),
   allCount: document.querySelector("#allCount"),
@@ -85,6 +93,7 @@ function normalizeBookmarks(items) {
       url: normalizeUrl(String(item.url).trim()),
       note: item.note ? String(item.note) : "",
       tags: Array.isArray(item.tags) ? item.tags.map(String).map((tag) => tag.trim()).filter(Boolean) : [],
+      collection: normalizeCollection(item.collection ? String(item.collection) : ""),
       favorite: Boolean(item.favorite),
       createdAt: Number(item.createdAt) || Date.now(),
       updatedAt: Number(item.updatedAt) || Number(item.createdAt) || Date.now(),
@@ -119,6 +128,28 @@ function parseTags(value) {
     .filter(Boolean);
 }
 
+function normalizeCollection(value) {
+  return value.trim() || DEFAULT_COLLECTION;
+}
+
+function getCollections() {
+  const collectionCounts = state.bookmarks.reduce((counts, bookmark) => {
+    const collection = normalizeCollection(bookmark.collection || "");
+    counts.set(collection, (counts.get(collection) || 0) + 1);
+    return counts;
+  }, new Map());
+
+  if (!collectionCounts.has(DEFAULT_COLLECTION)) {
+    collectionCounts.set(DEFAULT_COLLECTION, 0);
+  }
+
+  return [...collectionCounts.entries()].sort(([first], [second]) => {
+    if (first === DEFAULT_COLLECTION) return -1;
+    if (second === DEFAULT_COLLECTION) return 1;
+    return first.localeCompare(second, "ko");
+  });
+}
+
 function openForm(bookmark = null) {
   state.editingId = bookmark?.id || "";
   elements.formTitle.textContent = bookmark ? "링크 수정" : "새 링크 추가";
@@ -128,6 +159,7 @@ function openForm(bookmark = null) {
   elements.titleInput.value = bookmark?.title || "";
   elements.urlInput.value = bookmark?.url || "";
   elements.tagsInput.value = bookmark?.tags?.join(", ") || "";
+  elements.collectionInput.value = bookmark?.collection || state.selectedCollection || DEFAULT_COLLECTION;
   elements.noteInput.value = bookmark?.note || "";
 
   elements.bookmarkForm.classList.remove("hidden");
@@ -178,6 +210,7 @@ function importBookmarks(file) {
 
       state.bookmarks = bookmarks;
       state.selectedTag = "";
+      state.selectedCollection = "";
       state.search = "";
       elements.searchInput.value = "";
       closeForm();
@@ -202,8 +235,9 @@ function getFilteredBookmarks() {
       if (state.filter === "favorite" && !bookmark.favorite) return false;
       if (state.filter === "recent" && bookmark.createdAt < oneWeekAgo) return false;
       if (state.selectedTag && !bookmark.tags.includes(state.selectedTag)) return false;
+      if (state.selectedCollection && normalizeCollection(bookmark.collection || "") !== state.selectedCollection) return false;
 
-      const searchableText = [bookmark.title, bookmark.url, bookmark.note, ...bookmark.tags]
+      const searchableText = [bookmark.title, bookmark.url, bookmark.note, bookmark.collection, ...bookmark.tags]
         .join(" ")
         .toLowerCase();
       return searchableText.includes(search);
@@ -221,6 +255,50 @@ function renderCounts() {
 function renderFilters() {
   document.querySelectorAll(".filter-button").forEach((button) => {
     button.classList.toggle("active", button.dataset.filter === state.filter);
+  });
+}
+
+function renderCollections() {
+  elements.collectionList.innerHTML = "";
+  elements.collectionOptions.innerHTML = "";
+
+  const allButton = document.createElement("button");
+  const allName = document.createElement("span");
+  const allTotal = document.createElement("strong");
+
+  allButton.className = "collection-button";
+  allButton.type = "button";
+  allButton.classList.toggle("active", !state.selectedCollection);
+  allName.textContent = "모든 컬렉션";
+  allTotal.textContent = state.bookmarks.length;
+  allButton.addEventListener("click", () => {
+    state.selectedCollection = "";
+    render();
+  });
+  allButton.append(allName, allTotal);
+  elements.collectionList.append(allButton);
+
+  getCollections().forEach(([collection, count]) => {
+    const button = document.createElement("button");
+    const name = document.createElement("span");
+    const total = document.createElement("strong");
+    const option = document.createElement("option");
+
+    button.className = "collection-button";
+    button.type = "button";
+    button.classList.toggle("active", state.selectedCollection === collection);
+    name.textContent = collection;
+    total.textContent = count;
+    option.value = collection;
+
+    button.addEventListener("click", () => {
+      state.selectedCollection = state.selectedCollection === collection ? "" : collection;
+      render();
+    });
+
+    button.append(name, total);
+    elements.collectionList.append(button);
+    elements.collectionOptions.append(option);
   });
 }
 
@@ -254,6 +332,7 @@ function renderContext(count) {
   const parts = [];
   if (state.filter === "favorite") parts.push("즐겨찾기");
   if (state.filter === "recent") parts.push("최근 추가");
+  if (state.selectedCollection) parts.push(state.selectedCollection);
   if (state.selectedTag) parts.push(`#${state.selectedTag}`);
   if (state.search) parts.push(`"${state.search}" 검색`);
 
@@ -270,6 +349,7 @@ function renderBookmarks() {
   bookmarks.forEach((bookmark) => {
     const card = elements.template.content.firstElementChild.cloneNode(true);
     const title = card.querySelector(".bookmark-title");
+    const collectionBadge = card.querySelector(".collection-badge");
     const note = card.querySelector(".bookmark-note");
     const domain = card.querySelector(".bookmark-domain");
     const favicon = card.querySelector(".favicon");
@@ -280,6 +360,7 @@ function renderBookmarks() {
 
     title.href = bookmark.url;
     title.textContent = bookmark.title;
+    collectionBadge.textContent = normalizeCollection(bookmark.collection || "");
     note.textContent = bookmark.note || "메모 없이 저장된 링크";
     domain.textContent = getDomain(bookmark.url);
     favicon.textContent = bookmark.title.slice(0, 1).toUpperCase();
@@ -322,6 +403,7 @@ function renderBookmarks() {
 function render() {
   renderCounts();
   renderFilters();
+  renderCollections();
   renderTags();
   renderBookmarks();
 }
@@ -342,6 +424,7 @@ elements.bookmarkForm.addEventListener("submit", (event) => {
     url: normalizeUrl(elements.urlInput.value.trim()),
     note: elements.noteInput.value.trim(),
     tags: parseTags(elements.tagsInput.value),
+    collection: normalizeCollection(elements.collectionInput.value),
   };
 
   if (state.editingId) {
