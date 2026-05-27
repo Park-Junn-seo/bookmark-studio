@@ -32,6 +32,15 @@ input {
   font: inherit;
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 button {
   cursor: pointer;
 }
@@ -186,6 +195,13 @@ input:focus {
   margin-bottom: 20px;
 }
 
+.topbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .eyebrow {
   color: var(--accent);
   font-size: 0.78rem;
@@ -224,6 +240,25 @@ input:focus {
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.86);
   padding: 18px;
+}
+
+.form-heading {
+  margin-bottom: 16px;
+}
+
+.form-heading h3,
+.form-heading p {
+  margin: 0;
+}
+
+.form-heading h3 {
+  font-size: 1rem;
+}
+
+.form-heading p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.86rem;
 }
 
 .form-grid {
@@ -282,6 +317,7 @@ input:focus {
 }
 
 .favorite-button,
+.edit-button,
 .delete-button {
   border: 0;
   background: transparent;
@@ -342,9 +378,23 @@ input:focus {
   white-space: nowrap;
 }
 
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.edit-button,
+.delete-button {
+  font-weight: 800;
+}
+
+.edit-button {
+  color: var(--accent);
+}
+
 .delete-button {
   color: var(--rose);
-  font-weight: 800;
 }
 
 .empty-state {
@@ -402,6 +452,14 @@ input:focus {
   .topbar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .topbar-actions {
+    justify-content: stretch;
+  }
+
+  .topbar-actions button {
+    flex: 1 1 120px;
   }
 
   .form-grid {

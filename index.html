@@ -56,10 +56,19 @@
               <p class="eyebrow">내 링크 보관함</p>
               <h2>오늘의 영감을 잃어버리지 않게</h2>
             </div>
-            <button id="openFormButton" class="primary-button" type="button">+ 링크 추가</button>
+            <div class="topbar-actions">
+              <button id="exportButton" class="ghost-button" type="button">내보내기</button>
+              <button id="importButton" class="ghost-button" type="button">불러오기</button>
+              <button id="openFormButton" class="primary-button" type="button">+ 링크 추가</button>
+            </div>
+            <input id="importInput" class="visually-hidden" type="file" accept="application/json,.json" />
           </header>
 
           <form id="bookmarkForm" class="bookmark-form hidden" autocomplete="off">
+            <div class="form-heading">
+              <h3 id="formTitle">새 링크 추가</h3>
+              <p id="formHint">URL과 태그를 넣어두면 나중에 훨씬 찾기 쉬워요.</p>
+            </div>
             <div class="form-grid">
               <label>
                 <span>제목</span>
@@ -80,7 +89,7 @@
             </div>
             <div class="form-actions">
               <button id="cancelFormButton" class="ghost-button" type="button">취소</button>
-              <button class="primary-button" type="submit">저장</button>
+              <button id="submitFormButton" class="primary-button" type="submit">저장</button>
             </div>
           </form>
 
@@ -105,7 +114,10 @@
         <div class="card-tags"></div>
         <div class="card-footer">
           <span class="bookmark-domain"></span>
-          <button class="delete-button" type="button">삭제</button>
+          <div class="card-actions">
+            <button class="edit-button" type="button">수정</button>
+            <button class="delete-button" type="button">삭제</button>
+          </div>
         </div>
       </article>
     </template>

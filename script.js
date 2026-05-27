@@ -35,6 +35,7 @@ const state = {
   filter: "all",
   selectedTag: "",
   search: "",
+  editingId: "",
 };
 
 const elements = {
@@ -42,6 +43,12 @@ const elements = {
   bookmarkForm: document.querySelector("#bookmarkForm"),
   openFormButton: document.querySelector("#openFormButton"),
   cancelFormButton: document.querySelector("#cancelFormButton"),
+  exportButton: document.querySelector("#exportButton"),
+  importButton: document.querySelector("#importButton"),
+  importInput: document.querySelector("#importInput"),
+  formTitle: document.querySelector("#formTitle"),
+  formHint: document.querySelector("#formHint"),
+  submitFormButton: document.querySelector("#submitFormButton"),
   titleInput: document.querySelector("#titleInput"),
   urlInput: document.querySelector("#urlInput"),
   tagsInput: document.querySelector("#tagsInput"),
@@ -61,10 +68,27 @@ function loadBookmarks() {
   if (!saved) return sampleBookmarks;
 
   try {
-    return JSON.parse(saved);
+    return normalizeBookmarks(JSON.parse(saved));
   } catch {
     return sampleBookmarks;
   }
+}
+
+function normalizeBookmarks(items) {
+  if (!Array.isArray(items)) return [];
+
+  return items
+    .filter((item) => item && item.title && item.url)
+    .map((item) => ({
+      id: item.id || createId(),
+      title: String(item.title).trim(),
+      url: normalizeUrl(String(item.url).trim()),
+      note: item.note ? String(item.note) : "",
+      tags: Array.isArray(item.tags) ? item.tags.map(String).map((tag) => tag.trim()).filter(Boolean) : [],
+      favorite: Boolean(item.favorite),
+      createdAt: Number(item.createdAt) || Date.now(),
+      updatedAt: Number(item.updatedAt) || Number(item.createdAt) || Date.now(),
+    }));
 }
 
 function createId() {
@@ -93,6 +117,80 @@ function parseTags(value) {
     .split(",")
     .map((tag) => tag.trim())
     .filter(Boolean);
+}
+
+function openForm(bookmark = null) {
+  state.editingId = bookmark?.id || "";
+  elements.formTitle.textContent = bookmark ? "링크 수정" : "새 링크 추가";
+  elements.formHint.textContent = bookmark ? "저장하면 기존 북마크 내용이 업데이트돼요." : "URL과 태그를 넣어두면 나중에 훨씬 찾기 쉬워요.";
+  elements.submitFormButton.textContent = bookmark ? "수정 저장" : "저장";
+
+  elements.titleInput.value = bookmark?.title || "";
+  elements.urlInput.value = bookmark?.url || "";
+  elements.tagsInput.value = bookmark?.tags?.join(", ") || "";
+  elements.noteInput.value = bookmark?.note || "";
+
+  elements.bookmarkForm.classList.remove("hidden");
+  elements.titleInput.focus();
+}
+
+function closeForm() {
+  state.editingId = "";
+  elements.bookmarkForm.reset();
+  elements.bookmarkForm.classList.add("hidden");
+  elements.formTitle.textContent = "새 링크 추가";
+  elements.formHint.textContent = "URL과 태그를 넣어두면 나중에 훨씬 찾기 쉬워요.";
+  elements.submitFormButton.textContent = "저장";
+}
+
+function exportBookmarks() {
+  const payload = {
+    app: "Bookmark Studio",
+    exportedAt: new Date().toISOString(),
+    bookmarks: state.bookmarks,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  const date = new Date().toISOString().slice(0, 10);
+
+  anchor.href = url;
+  anchor.download = `bookmark-studio-${date}.json`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function importBookmarks(file) {
+  const reader = new FileReader();
+
+  reader.addEventListener("load", () => {
+    try {
+      const parsed = JSON.parse(reader.result);
+      const bookmarks = normalizeBookmarks(Array.isArray(parsed) ? parsed : parsed.bookmarks);
+
+      if (!bookmarks.length) {
+        alert("불러올 북마크를 찾지 못했어요.");
+        return;
+      }
+
+      const shouldReplace = confirm(`북마크 ${bookmarks.length}개를 불러올게요. 현재 목록은 덮어써집니다.`);
+      if (!shouldReplace) return;
+
+      state.bookmarks = bookmarks;
+      state.selectedTag = "";
+      state.search = "";
+      elements.searchInput.value = "";
+      closeForm();
+      saveBookmarks();
+      render();
+    } catch {
+      alert("JSON 파일을 읽지 못했어요. 내보내기 파일인지 확인해 주세요.");
+    } finally {
+      elements.importInput.value = "";
+    }
+  });
+
+  reader.readAsText(file);
 }
 
 function getFilteredBookmarks() {
@@ -176,6 +274,7 @@ function renderBookmarks() {
     const domain = card.querySelector(".bookmark-domain");
     const favicon = card.querySelector(".favicon");
     const favoriteButton = card.querySelector(".favorite-button");
+    const editButton = card.querySelector(".edit-button");
     const deleteButton = card.querySelector(".delete-button");
     const tags = card.querySelector(".card-tags");
 
@@ -189,13 +288,22 @@ function renderBookmarks() {
     favoriteButton.classList.toggle("active", bookmark.favorite);
     favoriteButton.addEventListener("click", () => {
       bookmark.favorite = !bookmark.favorite;
+      bookmark.updatedAt = Date.now();
       saveBookmarks();
       render();
     });
 
+    editButton.addEventListener("click", () => {
+      openForm(bookmark);
+    });
+
     deleteButton.addEventListener("click", () => {
+      const shouldDelete = confirm(`"${bookmark.title}" 북마크를 삭제할까요?`);
+      if (!shouldDelete) return;
+
       state.bookmarks = state.bookmarks.filter((item) => item.id !== bookmark.id);
       saveBookmarks();
+      if (state.editingId === bookmark.id) closeForm();
       render();
     });
 
@@ -219,33 +327,52 @@ function render() {
 }
 
 elements.openFormButton.addEventListener("click", () => {
-  elements.bookmarkForm.classList.remove("hidden");
-  elements.titleInput.focus();
+  openForm();
 });
 
 elements.cancelFormButton.addEventListener("click", () => {
-  elements.bookmarkForm.reset();
-  elements.bookmarkForm.classList.add("hidden");
+  closeForm();
 });
 
 elements.bookmarkForm.addEventListener("submit", (event) => {
   event.preventDefault();
 
-  const bookmark = {
-    id: createId(),
+  const formValues = {
     title: elements.titleInput.value.trim(),
     url: normalizeUrl(elements.urlInput.value.trim()),
     note: elements.noteInput.value.trim(),
     tags: parseTags(elements.tagsInput.value),
-    favorite: false,
-    createdAt: Date.now(),
   };
 
-  state.bookmarks = [bookmark, ...state.bookmarks];
+  if (state.editingId) {
+    state.bookmarks = state.bookmarks.map((bookmark) =>
+      bookmark.id === state.editingId ? { ...bookmark, ...formValues, updatedAt: Date.now() } : bookmark,
+    );
+  } else {
+    const bookmark = {
+      id: createId(),
+      ...formValues,
+      favorite: false,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    state.bookmarks = [bookmark, ...state.bookmarks];
+  }
+
   saveBookmarks();
-  elements.bookmarkForm.reset();
-  elements.bookmarkForm.classList.add("hidden");
+  closeForm();
   render();
+});
+
+elements.exportButton.addEventListener("click", exportBookmarks);
+
+elements.importButton.addEventListener("click", () => {
+  elements.importInput.click();
+});
+
+elements.importInput.addEventListener("change", (event) => {
+  const [file] = event.target.files;
+  if (file) importBookmarks(file);
 });
 
 elements.searchInput.addEventListener("input", (event) => {
